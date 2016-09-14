@@ -132,13 +132,16 @@ public class Http {
             var request: NSURLRequest
             var task: NSURLSessionTask?
             var delegate: TaskDataDelegate
+            // Merge headers
+            let headers = merge(self.requestSerializer.headers, self.authzModule?.authorizationFields())
+            
             // care for multipart request is multipart data are set
             if (self.hasMultiPartData(parameters)) {
-                request = self.requestSerializer.multipartRequest(finalURL, method: method, parameters: parameters, headers: self.authzModule?.authorizationFields())
+                request = self.requestSerializer.multipartRequest(finalURL, method: method, parameters: parameters, headers: headers)
                 task = self.session.uploadTaskWithStreamedRequest(request)
                 delegate = TaskUploadDelegate()
             } else {
-                request = self.requestSerializer.request(finalURL, method: method, parameters: parameters, headers: self.authzModule?.authorizationFields())
+                request = self.requestSerializer.request(finalURL, method: method, parameters: parameters, headers: headers)
                 task = self.session.dataTaskWithRequest(request);
                 delegate = TaskDataDelegate()
             }
@@ -188,11 +191,14 @@ public class Http {
                 return
             }
             var request: NSURLRequest
+            // Merge headers
+            let headers = merge(self.requestSerializer.headers, self.authzModule?.authorizationFields())
+
             // care for multipart request is multipart data are set
             if (self.hasMultiPartData(parameters)) {
-                request = self.requestSerializer.multipartRequest(finalURL, method: method, parameters: parameters, headers: self.authzModule?.authorizationFields())
+                request = self.requestSerializer.multipartRequest(finalURL, method: method, parameters: parameters, headers: headers)
             } else {
-                request = self.requestSerializer.request(finalURL, method: method, parameters: parameters, headers: self.authzModule?.authorizationFields())
+                request = self.requestSerializer.request(finalURL, method: method, parameters: parameters, headers: headers)
             }
             
             var task: NSURLSessionTask?
@@ -538,7 +544,13 @@ public class Http {
             if (destinationDirectory == nil) {  // use 'default documents' directory if not set
                 // use default documents directory
                 let documentsDirectory  = NSFileManager.defaultManager().URLsForDirectory(.DocumentDirectory, inDomains: .UserDomainMask)[0] as NSURL
-                finalDestination = documentsDirectory.URLByAppendingPathComponent(filename!)
+                #if swift(>=2.3)
+                    // this compiles on Xcode 8 / Swift 2.3 / iOS 10
+                    finalDestination = documentsDirectory.URLByAppendingPathComponent(filename!)!
+                #else
+                    // this compiles on Xcode 7 / Swift 2.2 / iOS 9
+                    finalDestination = documentsDirectory.URLByAppendingPathComponent(filename!)
+                #endif
             } else {
                 // check that the directory exists
                 let path = destinationDirectory?.stringByAppendingPathComponent(filename!)
@@ -571,7 +583,8 @@ public class Http {
     }
     
     // MARK: Utility methods
-    public func calculateURL(baseURL: String?,  var url: String) -> NSURL? {
+    public func calculateURL(baseURL: String?, url: String) -> NSURL? {
+        var url = url
         if (baseURL == nil || url.hasPrefix("http")) {
             return NSURL(string: url)!
         }
